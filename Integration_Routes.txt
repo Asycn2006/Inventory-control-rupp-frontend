@@ -1,0 +1,123 @@
+INVENTORY SYSTEM CONTROL - INTEGRATION ROUTES
+================================================
+
+This document outlines the complete mapping of Frontend URLs and the specific Backend APIs they interact with across all user roles (SuperAdmin, Admin, Supplier).
+
+------------------------------------------------
+1. FRONTEND URLs (Vue Router)
+------------------------------------------------
+These are the paths you use in your browser (e.g., http://localhost:5173/path):
+
+/login      - Authentication page (Email/Username & Password)
+/dashboard  - Main dashboard (Live KPIs & analytics for Admin/SuperAdmin; Vendor Portal & order metrics for Supplier)
+/products   - Product catalog (Full CRUD & Stock Adjustments/Transfers for Admin/SuperAdmin; Scoped supplied products view for Supplier)
+/orders     - Orders Management (Tabbed: Purchase Orders + Customer Sales Orders, multi-item creation, fulfillment status transitions, & Supplier acknowledgement)
+/users      - User Management with full RBAC (Create, Edit, Delete, Reset Password for Admin & Super Admin)
+/settings   - System Settings & Master Data (Tabbed CRUD: Categories, Warehouses, Suppliers, Customers)
+
+------------------------------------------------
+2. BACKEND APIs ACTIVELY USED IN UI
+------------------------------------------------
+These are all the endpoints wired up in the Vue.js frontend:
+
+[Authentication]
+- POST /api/auth/login
+  • Used on /login
+  • Returns JWT access token, refresh token, user role, and supplier_id (if applicable)
+- POST /api/auth/logout
+  • Used by Sidebar logout button
+  • Revokes refresh token and clears session
+
+[Dashboard & Analytics]
+- GET /api/analytics/dashboard
+  • Used on /dashboard (Admins & Super Admins)
+  • Returns inventory KPIs, low stock counts, and top-selling products
+- GET /api/purchase-orders
+  • Used on /dashboard (Suppliers)
+  • Returns supplier-specific order metrics and pending counts
+
+[Products & Inventory Control]
+- GET /api/products
+  • Used on /products
+  • Supports search, category filters, and automatic supplier scoping (suppliers only see their products)
+- POST /api/products
+  • Used on /products (Admin / Super Admin)
+  • Creates a new catalog item with SKU, pricing, min/max stock thresholds
+- PUT /api/products/:id
+  • Used on /products (Admin / Super Admin)
+  • Updates existing product details and pricing
+- DELETE /api/products/:id
+  • Used on /products (Admin / Super Admin)
+  • Removes product from catalog
+- POST /api/stock-transactions/adjustment
+  • Used on /products (Admin / Super Admin)
+  • Executes Stock In (+), Stock Out (-), or Manual Inventory Adjustments
+- POST /api/stock-transactions/transfer
+  • Used on /products (Admin / Super Admin)
+  • Transfers inventory between source and destination warehouses
+
+[Purchase Orders]
+- GET /api/purchase-orders
+  • Used on /orders (Purchase Orders tab)
+  • Scoped automatically: Suppliers only receive POs addressed to their supplier account
+- GET /api/purchase-orders/:id
+  • Used on /orders
+  • Displays order breakdown modal with line items, quantities, and pricing
+- POST /api/purchase-orders
+  • Used on /orders (Admin / Super Admin)
+  • Creates a purchase order with multiple line items, warehouse assignment, and dates
+- PUT /api/purchase-orders/:id/status
+  • Used on /orders
+  • Allows Suppliers to acknowledge POs (changes status to 'received') and Admins to manage workflow states
+
+[Sales Orders (Customer Orders)]
+- GET /api/sales-orders
+  • Used on /orders (Sales Orders tab - Admin / Super Admin only)
+  • Fetches customer sales orders, fulfillment statuses, and totals
+- GET /api/sales-orders/:id
+  • Used on /orders
+  • Displays order breakdown modal with item list, discount, and totals
+- POST /api/sales-orders
+  • Used on /orders (Admin / Super Admin)
+  • Creates a customer sales order with items, fulfillment warehouse, and discounts
+- PUT /api/sales-orders/:id/status
+  • Used on /orders (Admin / Super Admin)
+  • Updates fulfillment lifecycle: confirmed -> shipped -> delivered -> cancelled
+
+[Master Data Management]
+- GET, POST, PUT, DELETE /api/categories
+  • Used on /settings (Categories tab)
+  • Configure product categories, color badges, and descriptions
+- GET, POST, PUT, DELETE /api/warehouses
+  • Used on /settings (Warehouses tab)
+  • Manage warehouse locations, codes, addresses, and contacts
+- GET, POST, PUT, DELETE /api/suppliers
+  • Used on /settings (Suppliers tab)
+  • Manage supplier vendor contacts, codes, and payment terms (Suppliers see their own profile)
+- GET, POST, PUT, DELETE /api/customers
+  • Used on /settings (Customers tab - Admin / Super Admin only)
+  • Manage customer client directory, contact details, and credit limits
+- GET /api/categories/all, /api/warehouses/all, /api/suppliers/all, /api/products/all, /api/customers/all
+  • Used as fast dropdown lookups in Order and Product creation forms
+
+[Users Management]
+- GET /api/users
+  • Used on /users (Admin / Super Admin)
+  • Fetches paginated user list with role filtering
+- POST /api/users
+  • Used on /users (Admin / Super Admin)
+  • Creates new Admin, Staff, or Supplier accounts (links Supplier ID for supplier users)
+- PUT /api/users/:id
+  • Used on /users (Admin / Super Admin)
+  • Updates user information and role assignments
+- DELETE /api/users/:id
+  • Used on /users (Admin / Super Admin)
+  • Deletes user accounts
+- POST /api/users/:id/reset-password
+  • Used on /users (Super Admin & Admin)
+  • Allows administrators to set new passwords for accounts
+
+[Real-Time WebSockets]
+- Socket Event: low_stock_alert
+  • Handled in MainLayout.vue
+  • Notifies admins and suppliers when products breach min_stock_level
